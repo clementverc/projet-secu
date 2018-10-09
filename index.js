@@ -1,23 +1,23 @@
 const { createServer } = require('https');
 const { readFileSync, chmodSync } = require('fs');
+const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
 const multer = require('multer');
 const csrf = require('csurf');
 const cookieParser = require('cookie-parser');
-
 // SETUP APP
 const app = express();
 var basicAuth = require('basic-auth');
  
 var auth = function (req, res, next) {
-  var user = basicAuth(req);
+  const user = basicAuth(req);
   if (!user || !user.name || !user.pass) {
     res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
     res.sendStatus(401);
     return;
   }
-  if (user.name === 'amy' && user.pass === 'passwd123') {
+  if (user.name === process.env.USERNAME && user.pass === process.env.PWD) {
     next();
   } else {
     res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
@@ -25,8 +25,10 @@ var auth = function (req, res, next) {
     return;
   }
 }
+app.use(express.static(__dirname + '/photo-storage'));
  
 app.get("/images", auth, function (req, res) {
+
     res.send("This page is authenticated!")
 });
 app.use('/', express.static(__dirname + '/'));
@@ -104,8 +106,6 @@ function getExtension(file) {
     return res;
 }
 
-/* ROUTES
-**********/
 app.get('/', function (req, res) {
     res.send(` 
     <form action="/upload?_csrf=${ req.csrfToken() }" enctype="multipart/form-data" method="POST">
@@ -117,10 +117,9 @@ app.get('/', function (req, res) {
         </div>
         </div>
     </form>
+    <h2><a href="/images">lien vers les images<a></h2>
     `
     )
-        fchmodSync(`./photo-storage/${req.file.filename}`, '666')
-
 });
 
 app.post('/upload', function (req, res) {
