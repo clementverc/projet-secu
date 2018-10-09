@@ -1,6 +1,5 @@
 node_modules/
 *.pem
-.env
 .env.sample
 package-lock.json
 *.jpg
