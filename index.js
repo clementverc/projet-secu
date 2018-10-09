@@ -6,31 +6,11 @@ const helmet = require('helmet');
 const multer = require('multer');
 const csrf = require('csurf');
 const cookieParser = require('cookie-parser');
-// SETUP APP
+const Magic = require('mmmagic').Magic;
+
 const app = express();
 var basicAuth = require('basic-auth');
- 
-var auth = function (req, res, next) {
-  const user = basicAuth(req);
-  if (!user || !user.name || !user.pass) {
-    res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
-    res.sendStatus(401);
-    return;
-  }
-  if (user.name === process.env.USERNAME && user.pass === process.env.PWD) {
-    next();
-  } else {
-    res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
-    res.sendStatus(401);
-    return;
-  }
-}
 app.use(express.static(__dirname + '/photo-storage'));
- 
-app.get("/images", auth, function (req, res) {
-
-    res.send("This page is authenticated!")
-});
 app.use('/', express.static(__dirname + '/'));
 
 const maxFileSize = 4194304 // Taille du fichier en octets
@@ -54,44 +34,35 @@ app.use(helmet.ieNoOpen());
 app.use(helmet.referrerPolicy({ policy: 'no-referrer' }));
 //MULTER CONFIG: to get file photos to temp server storage
 const multerConfig = multer({
-
     //specify diskStorage (another option is memory)
     storage: multer.diskStorage({
-
         //specify destination
         destination: function (req, file, next) {
             next(null, './photo-storage');
         },
-
         //specify the filename to be unique
         filename: function (req, file, next) {
             console.log(file);
-            //get the file mimetype ie 'image/jpeg' split and prefer the second value ie'jpeg'
-            //const ext = file.mimetype.split('/')[1];
-            //set the file fieldname to a unique name containing the original name, current datetime and the extension.
             next(null, file.fieldname + '-' + Date.now() + getExtension(file))
         }
     }),
     limits: {fileSize: maxFileSize, files: 1},
-
     // filter out and prevent non-image files.
     fileFilter: function (req, file, next) {
         if (!file) {
             next();
         }
-
         // only permit image mimetypes
         const image = file.mimetype.startsWith('image/');
-
-        if (image) {
-            console.log('photo uploaded');
-            next(null, true);
-        }
-        else {
-            console.log("file not supported")
-            //TODO:  A better message response to user on failure.
-            return next();
-        }
+            if (image) {
+                console.log('photo uploaded');
+                next(null, true);
+            }
+            else {
+                console.log("file not supported")
+                //TODO:  A better message response to user on failure.
+                return next();
+            }
     }
 });
 
@@ -105,6 +76,30 @@ function getExtension(file) {
     if (file.mimetype === 'image/png') res = '.png';
     return res;
 }
+
+var auth = function (req, res, next) {
+  const user = basicAuth(req);
+  if (!user || !user.name || !user.pass) {
+    res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+    res.sendStatus(401);
+    return;
+  }
+  if (user.name === process.env.USERNAME && user.pass === process.env.PWD) {
+    next();
+  } else {
+    res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+    res.sendStatus(401);
+    return;
+  }
+}
+
+var magic = new Magic();
+magic.detectFile('node_modules/mmmagic/build/Release/magic.node', function(err, result) {
+  if (err) throw err;
+  console.log(result);
+  // output on Windows with 32-bit node:
+  //    PE32 executable (DLL) (GUI) Intel 80386, for MS Windows
+});
 
 app.get('/', function (req, res) {
     res.send(` 
@@ -120,6 +115,11 @@ app.get('/', function (req, res) {
     <h2><a href="/images">lien vers les images<a></h2>
     `
     )
+});
+
+app.get("/images", auth, function (req, res) {
+
+    res.send("This page is authenticated!")
 });
 
 app.post('/upload', function (req, res) {
